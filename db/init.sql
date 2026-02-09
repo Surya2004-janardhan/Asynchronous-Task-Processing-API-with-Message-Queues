@@ -13,7 +13,7 @@ create table if not exists tasks (
     id varchar(36) primary key,
     title varchar(255) not null,
     description text,
-    status varchar(50) default 'pending',
+    status enum('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') not null default 'PENDING',
     metadata json,
     created_at timestamp default current_timestamp,
     updated_at timestamp default current_timestamp on update current_timestamp,
