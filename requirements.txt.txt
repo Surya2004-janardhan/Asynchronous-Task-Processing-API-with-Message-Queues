@@ -1,0 +1,330 @@
+Build an Asynchronous Task Processing API with Message Queues
+
+Objective
+Develop a robust backend service that handles asynchronous task processing using a message queue. This task challenges you to move beyond synchronous request-response patterns and implement a scalable, decoupled system. You will design a RESTful API endpoint to submit tasks and a separate worker service to consume and process these tasks asynchronously, updating their status in a database. Through this project, you will gain hands-on experience with fundamental backend concepts such as message queues (e.g., RabbitMQ), asynchronous processing, worker patterns, and ensuring data consistency across decoupled services. These skills are critical for building high-performance, resilient, and scalable backend systems in modern distributed architectures.
+
+Description
+Background
+In modern distributed systems, synchronously processing every request can lead to bottlenecks, poor user experience, and system instability, especially for long-running operations. Asynchronous task processing, leveraging message queues, provides a robust solution by decoupling the request initiation from its actual execution. This approach allows a frontend or client application to submit a task and immediately receive an acknowledgment, freeing it to perform other operations while the backend processes the task in the background. This pattern is crucial for building scalable and responsive applications across various industries, from e-commerce order fulfillment to data processing pipelines and content generation systems.
+
+Implementation Guidelines
+API Design
+Design RESTful endpoints that are intuitive and adhere to best practices. Use appropriate HTTP methods and status codes. The API should primarily serve as an entry point for task submission and status retrieval, not for task execution itself.
+
+Database Interaction
+Utilize a relational database (MySQL) to persistently store task metadata. Design a simple schema to track task IDs, titles, descriptions, statuses, and timestamps. Ensure efficient indexing for task_id to enable quick lookups. Consider atomicity for database operations, especially when updating task statuses.
+
+Message Queue Usage
+Leverage RabbitMQ as the message broker. The API service should act as a producer, publishing messages to a queue. The worker service will act as a consumer, reading messages from this queue. Ensure messages are durable and acknowledged properly to prevent data loss in case of service failures. Explore consumer acknowledgment (ACK) and negative acknowledgment (NACK) patterns.
+
+Worker Service Design
+Design the worker service to be stateless and resilient. It should be able to process messages independently and in parallel if scaled. Implement retry mechanisms or dead-letter queues for messages that fail to process after multiple attempts.
+
+Error Handling and Validation
+Implement comprehensive input validation at the API layer. Return clear, standardized error responses with appropriate HTTP status codes (e.g., 400 for bad input, 404 for not found, 500 for server errors). Both services should include robust logging to aid debugging and monitoring.
+
+Containerization
+Use Docker and Docker Compose to containerize your API, worker, RabbitMQ, and MySQL components. This ensures a consistent development and deployment environment and demonstrates proficiency in modern DevOps practices.
+
+Implementation Details
+Project Structure
+Organize your project into distinct directories for the API service, worker service, and shared components (e.g., database models, message queue clients).
+
+. 
+├── api-service/ 
+│   ├── src/ 
+│   │   ├── main.py  # Or Main.java 
+│   │   ├── api/  # REST endpoints 
+│   │   ├── services/  # Business logic, message publishing 
+│   │   └── models/  # Database models 
+│   ├── Dockerfile 
+│   └── requirements.txt  # Or pom.xml/build.gradle 
+├── worker-service/ 
+│   ├── src/ 
+│   │   ├── main.py  # Or Main.java 
+│   │   ├── services/  # Message consumption, task processing 
+│   │   └── models/  # Re-use or define database models 
+│   ├── Dockerfile 
+│   └── requirements.txt  # Or pom.xml/build.gradle 
+├── db/ 
+│   └── init.sql  # SQL schema and seed data 
+├── docker-compose.yml 
+├── .env.example 
+└── README.md 
+Database Schema (MySQL)
+Create a tasks table with the following columns in db/init.sql:
+
+CREATE TABLE tasks (
+    id VARCHAR(36) PRIMARY KEY, # Unique task ID (UUID) 
+    title VARCHAR(255) NOT NULL, 
+    description TEXT, 
+    status ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'PENDING', 
+    metadata JSON, # Store additional JSON data 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
+    completed_at TIMESTAMP # Timestamp when task completed 
+);
+API Service Endpoints
+Implement the following endpoints (using your chosen framework, e.g., FastAPI, Spring Boot):
+
+# api-service/src/api/tasks.py (Example using Python/FastAPI)
+
+from fastapi import APIRouter, HTTPException, Depends, status
+from pydantic import BaseModel
+from typing import Optional, Dict
+import uuid
+import json
+
+# Assume db_connection and rabbitmq_client are properly initialized dependencies
+
+router = APIRouter()
+
+class TaskCreate(BaseModel):
+    title: str
+    description: str
+    metadata: Optional[Dict] = None
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    title: str
+    description: str
+    created_at: str
+    updated_at: str
+    completed_at: Optional[str] = None
+
+@router.post('/tasks', status_code=status.HTTP_202_ACCEPTED)
+async def submit_task(task: TaskCreate, db=Depends(get_db_connection), rmq=Depends(get_rabbitmq_client)):
+    # Generate unique task_id
+    task_id = str(uuid.uuid4())
+    
+    # Insert task into database with 'PENDING' status
+    # SQL: INSERT INTO tasks (id, title, description, metadata, status) VALUES (%s, %s, %s, %s, 'PENDING')
+    # Example: db.execute(insert_task_sql, (task_id, task.title, task.description, json.dumps(task.metadata or {})))
+    
+    # Publish message to RabbitMQ
+    message = {
+        'task_id': task_id,
+        'title': task.title,
+        'description': task.description,
+        'metadata': task.metadata
+    }
+    # rmq.publish('task_queue', json.dumps(message))
+    
+    return {'task_id': task_id, 'message': 'Task submitted successfully for processing'}
+
+@router.get('/tasks/{task_id}', response_model=TaskStatusResponse)
+async def get_task_status(task_id: str, db=Depends(get_db_connection)):
+    # Retrieve task from database using task_id
+    # SQL: SELECT id, title, description, status, created_at, updated_at, completed_at FROM tasks WHERE id = %s
+    # Example: task_data = db.fetch_one(select_task_sql, (task_id,))
+    
+    # If task_data is None, raise HTTPException(status_code=404, detail='Task not found')
+    # Return TaskStatusResponse object constructed from task_data
+    pass # Implement actual database retrieval and response mapping
+Worker Service Logic
+Implement a consumer that connects to RabbitMQ and processes messages:
+
+# worker-service/src/main.py (Example using Python/Pika/SQLAlchemy)
+
+import pika
+import time
+import json
+# Assume db_session and rabbitmq_connection are properly initialized
+
+def process_task(task_data, db_session):
+    task_id = task_data['task_id']
+    print(f"[Worker] Processing task: {task_id}")
+    
+    # Update task status to 'PROCESSING' in DB (optional, but good for detailed tracking)
+    # db_session.query(Task).filter_by(id=task_id).update({'status': 'PROCESSING'})
+    # db_session.commit()
+
+    time.sleep(5) # Simulate work 
+    
+    # Update task status to 'COMPLETED' and set completed_at timestamp
+    # db_session.query(Task).filter_by(id=task_id).update({'status': 'COMPLETED', 'completed_at': func.now()})
+    # db_session.commit()
+    
+    print(f"[Worker] Task {task_id} completed.")
+
+def callback(ch, method, properties, body):
+    task_data = json.loads(body)
+    try:
+        # db_session should be managed per-thread/per-callback in a real application
+        process_task(task_data, get_db_session())
+        ch.basic_ack(method.delivery_tag)
+    except Exception as e:
+        print(f"[Worker] Error processing task {task_data['task_id']}: {e}")
+        ch.basic_nack(method.delivery_tag, requeue=True) # Or move to dead-letter queue
+
+# Main consumer loop
+# channel.basic_consume(queue='task_queue', on_message_callback=callback)
+# channel.start_consuming()
+Docker Compose Configuration (docker-compose.yml)
+version: '3.8'
+services:
+  mysql_db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - app_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Management UI 
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  api_service:
+    build:
+      context: ./api-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "mysql+mysqlconnector://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql_db:3306/${MYSQL_DATABASE}"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_USER: "${RABBITMQ_USER}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  worker_service:
+    build:
+      context: ./worker-service
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: "mysql+mysqlconnector://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql_db:3306/${MYSQL_DATABASE}"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_USER: "${RABBITMQ_USER}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app_network
+
+volumes:
+  mysql_data:
+
+networks:
+  app_network:
+    driver: bridge
+Environment Variables (.env.example)
+MYSQL_ROOT_PASSWORD=rootpassword
+MYSQL_DATABASE=async_tasks_db
+MYSQL_USER=user
+MYSQL_PASSWORD=password
+
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=guest
+Submission Instructions
+Your submission must be a Git repository containing all source code and documentation. Ensure your README.md is comprehensive. The following artifacts are mandatory:
+
+Application Code: All source code for both the api-service and worker-service (in api-service/ and worker-service/ directories respectively).
+README.md: A detailed README.md at the root of your repository. It must include:
+Project Title and Description.
+Setup Instructions: Clear, step-by-step guidance on how to set up and run your services using docker-compose up.
+API Documentation: List all available API endpoints (e.g., POST /api/tasks, GET /api/tasks/{task_id}) with expected request/response formats and examples.
+Architectural Overview: Briefly explain the design decisions, especially regarding message queue usage and error handling.
+Testing Instructions: How to run the provided unit and integration tests.
+Technologies Used: List the specific frameworks, libraries, and languages chosen.
+docker-compose.yml: A docker-compose.yml file in the root directory that orchestrates the API service, worker service, RabbitMQ, and MySQL database.
+Dockerfiles: A Dockerfile for api-service and worker-service.
+.env.example: An .env.example file documenting all environment variables required for your application.
+db/init.sql: A SQL script for database schema creation and any initial seed data.
+Test Suite: Your unit and integration tests (e.g., in a tests/ directory or alongside relevant code). Ensure tests can be executed via a simple command (e.g., docker-compose exec api_service pytest).
+Optional (bonus) artifacts:
+
+API documentation generated with tools like OpenAPI/Swagger.
+Sequence diagrams illustrating the task submission and processing flow.
+Evaluation Overview
+Your submission will be evaluated based on the completeness and correctness of the backend functionality, adherence to API design principles, proper implementation of asynchronous processing using message queues, and the robustness of your data persistence layer. We will run automated tests against your API endpoints and worker logic to verify functional requirements, assess code quality through automated code analysis for best practices and security, and manually review your documentation and overall system design for clarity and maintainability. Key focus areas include functional correctness, clean code, effective use of Docker for deployment, comprehensive testing, and clear documentation, which are all vital for production-ready backend services.
+
+Common Mistakes To Avoid
+Synchronous Processing: Forgetting to actually implement asynchronous processing; performing heavy operations directly in the API request thread.
+Lack of Error Handling: Not handling database connection errors, message queue connection errors, or invalid API inputs gracefully.
+Poor Message Acknowledgment: Not acknowledging messages in RabbitMQ, leading to messages being re-processed or lost.
+Tight Coupling: Directly calling worker logic from the API service instead of publishing to the message queue.
+Insufficient Docker Configuration: Missing Dockerfiles, incorrect docker-compose.yml configurations, or services failing to start correctly.
+Vague Documentation: A README.md that lacks clear setup instructions, API examples, or architectural explanations.
+Missing or Inadequate Testing: Submitting code without unit or integration tests for critical components.
+FAQ
+Q: Can I use a different message queue than RabbitMQ? A: While RabbitMQ is suggested due to its widespread adoption and ease of local setup, you may use another message queue (e.g., Apache Kafka, Redis Streams) if you are familiar with it and can demonstrate its proper integration with Docker Compose. Just ensure it aligns with the asynchronous processing requirements.
+Q: What programming language should I use? A: You are free to use any modern backend programming language and framework you are proficient in (e.g., Python with FastAPI/Flask, Java with Spring Boot, Node.js with Express). The task focuses on architectural patterns, not specific language/framework mastery.
+Q: How should I manage database migrations? A: For this task, simply use the db/init.sql script executed via docker-entrypoint-initdb.d for MySQL. For more complex projects, consider dedicated migration tools like Alembic (Python) or Flyway/Liquibase (Java).
+Q: How do I simulate task processing effectively in the worker? A: A simple time.sleep() call is sufficient for simulating work. In a real application, this would involve complex computations, API calls to external services, or file processing.
+Q: What if a message fails to process in the worker? A: Implement error handling in your worker's message callback. You can either negatively acknowledge (NACK) the message to requeue it (with or without a delay, depending on your RabbitMQ config) or move it to a dead-letter queue for later inspection.
+Q: Is it okay to use an ORM for database interaction? A: Yes, using an ORM (like SQLAlchemy for Python or Hibernate for Java) is perfectly acceptable and often encouraged for managing database interactions efficiently.
+Q: Do I need to implement user authentication for the API? A: No, for this specific task, focus on the asynchronous processing and message queue integration. Authentication is not a core requirement but can be added as an optional enhancement if time permits.
+Core Requirements
+Implement a RESTful API endpoint: POST /api/tasks to accept task submission requests. The request body must contain title (string), description (string), and metadata (JSON object, optional).
+Upon receiving a valid POST /api/tasks request, the API service must validate inputs, assign a unique task_id (UUID), store initial task metadata (including task_id and initial status 'PENDING') in a MySQL database, and publish a message containing the task_id and other relevant details to a RabbitMQ message queue.
+The API endpoint should respond with a 202 Accepted status code and a JSON payload including the generated task_id.
+Implement a worker service that continuously consumes messages from the RabbitMQ queue.
+For each message consumed, the worker service must simulate a processing delay (e.g., 5-10 seconds).
+After simulating processing, the worker service must update the status of the corresponding task in the MySQL database to 'COMPLETED' and include a completed_at timestamp.
+Implement a GET /api/tasks/{task_id} endpoint that allows clients to retrieve the current status and details of a specific task from the MySQL database.
+Implement proper error handling for all API endpoints, returning appropriate HTTP status codes (e.g., 400 for bad request, 404 for not found, 500 for internal server errors) and standardized JSON error responses.
+Ensure input validation for POST /api/tasks requests (e.g., title and description are non-empty strings).
+Configure both the API service and the worker service to run using Docker, using a Dockerfile for each.
+Provide a docker-compose.yml file to orchestrate the API service, worker service, RabbitMQ, and MySQL database for local development.
+Implement unit tests for core business logic within both the API service and the worker service (e.g., message publishing logic, task status update logic).
+Implement basic integration tests to verify the end-to-end flow: submitting a task via API, checking its initial status, and verifying its status changes to 'COMPLETED' after worker processing.
+Implementation Guidelines
+API Design: Adhere to REST principles. Endpoints should represent resources (tasks) and use standard HTTP methods. Ensure clear request/response schemas.
+Modularity: Structure your codebase into logical modules (e.g., API routes, services, database interactions, message queue clients) to promote maintainability and testability.
+Dependency Injection: Consider using dependency injection for database connections and message queue clients to facilitate testing and configuration management.
+Error Handling: Implement a centralized error handling mechanism to catch exceptions and return consistent, well-structured error responses.
+Logging: Incorporate structured logging in both services to track task lifecycle, debug issues, and monitor system health.
+Environment Configuration: Externalize all configurable parameters (database credentials, queue details, ports) using environment variables, managed via a .env file and .env.example.
+Idempotency (Recommended for Worker): Consider how to make worker processing idempotent. If a message is processed multiple times due to retries, the final state should be the same as if it were processed once.
+Expected Outcomes
+A functional RESTful API endpoint capable of receiving task submission requests and responding with a 202 Accepted status.
+Task data is reliably stored in the MySQL database immediately after API submission, with an initial 'PENDING' status.
+Task messages are successfully published to and consumed from the RabbitMQ message queue.
+The worker service correctly processes tasks asynchronously and updates the task status to 'COMPLETED' in the database.
+The GET /api/tasks/{task_id} endpoint accurately retrieves the current status of any submitted task.
+Both API and worker services handle common errors gracefully, providing informative responses and logging.
+The entire application (API, worker, RabbitMQ, MySQL) is containerized and orchestratable via a single docker-compose up command.
+Comprehensive unit and integration tests are provided and pass, demonstrating the correctness of core logic and the end-to-end flow.
+The README.md clearly documents setup, usage, API endpoints, and architectural choices, allowing another developer to easily understand and run the project.
+
+
+
+
+Submission Instructions
+Your submission must be a Git repository containing all source code and documentation. Ensure your README.md is comprehensive. The following artifacts are mandatory:\n\n* Application Code: All source code for both the api-service and worker-service (in api-service/ and worker-service/ directories respectively).\n* README.md: A detailed README.md at the root of your repository. It must include:\n * Project Title and Description.\n * Setup Instructions: Clear, step-by-step guidance on how to set up and run your services using docker-compose up.\n * API Documentation: List all available API endpoints (e.g., POST /api/tasks, GET /api/tasks/{task_id}) with expected request/response formats and examples.\n * Architectural Overview: Briefly explain the design decisions, especially regarding message queue usage and error handling.\n * Testing Instructions: How to run the provided unit and integration tests.\n * Technologies Used: List the specific frameworks, libraries, and languages chosen.\n* docker-compose.yml: A docker-compose.yml file in the root directory that orchestrates the API service, worker service, RabbitMQ, and MySQL database.\n* Dockerfiles: A Dockerfile for api-service and worker-service.\n* .env.example: An .env.example file documenting all environment variables required for your application.\n* db/init.sql: A SQL script for database schema creation and any initial seed data.\n* Test Suite: Your unit and integration tests (e.g., in a tests/ directory or alongside relevant code). Ensure tests can be executed via a simple command (e.g., docker-compose exec api_service pytest).\n\nOptional (bonus) artifacts:\n* API documentation generated with tools like OpenAPI/Swagger.\n* Sequence diagrams illustrating the task submission and processing flow.
+
+Evaluation Overview
+Your submission will be evaluated based on the completeness and correctness of the backend functionality, adherence to API design principles, proper implementation of asynchronous processing using message queues, and the robustness of your data persistence layer. We will run automated tests against your API endpoints and worker logic to verify functional requirements, assess code quality through automated code analysis for best practices and security, and manually review your documentation and overall system design for clarity and maintainability. Key focus areas include functional correctness, clean code, effective use of Docker for deployment, comprehensive testing, and clear documentation, which are all vital for production-ready backend services.
+
