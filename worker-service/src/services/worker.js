@@ -22,7 +22,10 @@ async function processTask(message) {
         // simulate task processing as per the tasks reqs from partner
         await new Promise(resolve => setTimeout(resolve, 5000));
         // update status to COMPLETED
-        await taskModel.update(task.id, { status: 'COMPLETED' });
+        await taskModel.update(task.id, { 
+            status: 'COMPLETED',
+            completed_at: new Date()
+        });
         return true;
     } catch (error) {
         console.error('Error processing task:', error);
