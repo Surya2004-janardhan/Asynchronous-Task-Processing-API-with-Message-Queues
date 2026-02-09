@@ -34,7 +34,7 @@ services:
     build: ./api-service
     container_name: api_service
     ports:
-      - "3000:3000"
+      - "8000:8000"
     depends_on:
       - mysql_db
       - rabbitmq
