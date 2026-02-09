@@ -16,6 +16,14 @@ const taskService = require('../services/taskService');
 
 // POST /api/tasks
 router.post('/', async (req, res) => {
+    const { title, description } = req.body;
+    
+    // Input validation as per requirements
+    if (!title || typeof title !== 'string' || title.trim() === '' ||
+        !description || typeof description !== 'string' || description.trim() === '') {
+        return res.status(400).json({ error: 'Title and Description are required and must be non-empty strings' });
+    }
+
     try {
         const task = await taskService.create(req.body);
         res.status(202).json(task);
