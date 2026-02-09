@@ -10,6 +10,7 @@
 
 // main logic 
 
+const { v4: uuidv4 } = require('uuid');
 const taskModel = require('../models/task');
 const { publishToQueue } = require('../rabbitmq/publisher');
 
