@@ -13,7 +13,7 @@ describe('Worker Service Unit Tests', () => {
 
     test('processTask() should update status to PROCESSING and then COMPLETED (Positive)', async () => {
         const mockMessage = {
-            content: Buffer.from(JSON.stringify({ id: '123' }))
+            content: Buffer.from(JSON.stringify({ task_id: '123' }))
         };
 
         taskModel.update.mockResolvedValue(true);
@@ -29,7 +29,7 @@ describe('Worker Service Unit Tests', () => {
 
     test('processTask() should update status to FAILED on error (Negative)', async () => {
         const mockMessage = {
-            content: Buffer.from(JSON.stringify({ id: '123' }))
+            content: Buffer.from(JSON.stringify({ task_id: '123' }))
         };
 
         taskModel.update.mockImplementationOnce(() => Promise.reject(new Error('DB Error')));
