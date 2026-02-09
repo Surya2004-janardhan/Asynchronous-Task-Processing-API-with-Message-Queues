@@ -1,0 +1,95 @@
+openapi: 3.0.0
+info:
+  title: Asynchronous Task Processing API
+  description: API for submitting and monitoring asynchronous background tasks using RabbitMQ and MySQL.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+paths:
+  /api/tasks:
+    post:
+      summary: Submit a new task
+      description: Validates input, stores task in DB as PENDING, and publishes to RabbitMQ.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - description
+              properties:
+                title:
+                  type: string
+                  example: "Generate Annual Report"
+                description:
+                  type: string
+                  example: "Processing financial data for FY2024"
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  example: { "priority": "high" }
+      responses:
+        '202':
+          description: Task accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+
+  /api/tasks/{id}:
+    get:
+      summary: Get task status
+      description: Retrieves the current status and metadata of a task from the database.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique task ID (UUID)
+      responses:
+        '200':
+          description: Task details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: Task not found
+        '500':
+          description: Server error
+
+components:
+  schemas:
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
