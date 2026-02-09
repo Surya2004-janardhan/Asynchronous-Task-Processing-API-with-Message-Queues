@@ -6,3 +6,65 @@
 # 3. Define 'api_service' which depends on DB and RabbitMQ.
 # 4. Define 'worker_service' which also depends on DB and RabbitMQ.
 # 5. Configure networks, volumes, and environment variables for all services.
+
+# compose file for all docker services
+
+version: '3.8'
+
+services:
+  mysql_db:
+    image: mysql:8.0
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: [PASSWORD]
+      MYSQL_DATABASE: task_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  api_service:
+    build: ./api-service
+    container_name: api_service
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mysql_db
+      - rabbitmq
+    environment:
+      MYSQL_HOST: mysql_db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: [PASSWORD]
+      MYSQL_DB: task_db
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+
+  worker_service:
+    build: ./worker-service
+    container_name: worker_service
+    depends_on:
+      - mysql_db
+      - rabbitmq
+    environment:
+      MYSQL_HOST: mysql_db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: [PASSWORD]
+      MYSQL_DB: task_db
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+
+volumes:
+  mysql_data:
