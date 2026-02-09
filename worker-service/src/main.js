@@ -7,3 +7,10 @@
  * 3. Start the RabbitMQ consumer to listen for messages on 'task_queue'.
  * 4. Handle process termination signals (SIGINT, SIGTERM) for graceful shutdown.
  */
+// main entry for worker 
+
+const { connect } = require('./rabbitmq/consumer');
+
+// start worker
+connect();
+
