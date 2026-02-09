@@ -25,7 +25,15 @@ async function create(task) {
         updated_at: new Date()
     };
     await taskModel.create(taskData);
-    await publishToQueue('task_queue', taskData);
+    
+    // Publish message with exact payload required (task_id)
+    const message = {
+        task_id: taskId,
+        title: task.title,
+        description: task.description,
+        metadata: task.metadata
+    };
+    await publishToQueue('task_queue', message);
     return taskData;
 }
 
