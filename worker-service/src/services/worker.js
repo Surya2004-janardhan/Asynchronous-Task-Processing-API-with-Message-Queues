@@ -18,11 +18,11 @@ async function processTask(message) {
     const task = JSON.parse(message.content.toString());
     try {
         // update status to PROCESSING
-        await taskModel.update(task.id, { status: 'PROCESSING' });
+        await taskModel.update(task.task_id, { status: 'PROCESSING' });
         // simulate task processing as per the tasks reqs from partner
         await new Promise(resolve => setTimeout(resolve, 5000));
         // update status to COMPLETED
-        await taskModel.update(task.id, { 
+        await taskModel.update(task.task_id, { 
             status: 'COMPLETED',
             completed_at: new Date()
         });
@@ -30,7 +30,7 @@ async function processTask(message) {
     } catch (error) {
         console.error('Error processing task:', error);
         // update status to FAILED
-        await taskModel.update(task.id, { status: 'FAILED' });
+        await taskModel.update(task.task_id, { status: 'FAILED' });
         return false;
     }
 }
