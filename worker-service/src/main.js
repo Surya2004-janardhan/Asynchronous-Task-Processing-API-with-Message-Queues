@@ -9,6 +9,7 @@
  */
 // main entry for worker 
 
+require('dotenv').config();
 const { connect } = require('./rabbitmq/consumer');
 
 // start worker
