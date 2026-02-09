@@ -9,3 +9,19 @@
  * 5. Register the task API routes.
  * 6. Start the server on the configured port.
  */
+// entry points server
+
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+
+// middleware
+app.use(express.json());
+
+// routes
+app.use('/api/tasks', require('./api/tasks'));
+
+// start server
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});
