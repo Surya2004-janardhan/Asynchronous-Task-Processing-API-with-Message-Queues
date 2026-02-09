@@ -1,0 +1,13 @@
+# .gitignore
+
+# node_modules
+node_modules
+
+# environment variables
+.env
+
+# build files
+build
+
+# logs
+logs
