@@ -7,7 +7,7 @@
 -- 4. Be executed automatically by the MySQL container on startup.
 
 
-create database if not exists task_db;
+create database if not exists async_tasks_db;
 
 create table if not exists tasks (
     id varchar(36) primary key,
@@ -26,5 +26,5 @@ create index idx_created_at on tasks(created_at);
 
 
 -- auto execution on startup
-use task_db; 
+use async_tasks_db; 
 
