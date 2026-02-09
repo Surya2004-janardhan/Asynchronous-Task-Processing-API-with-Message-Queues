@@ -1,3 +1,6 @@
+// Manual mock of setTimeout to bypass environment issues with fake timers
+global.setTimeout = jest.fn((fn, ms) => fn());
+
 const { processTask } = require('../../src/services/worker');
 const taskModel = require('../../src/models/task');
 
@@ -6,12 +9,6 @@ jest.mock('../../src/models/task');
 describe('Worker Service Unit Tests', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        // Mock setTimeout to run immediately
-        jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-        jest.useRealTimers();
     });
 
     test('processTask() should update status to PROCESSING and then COMPLETED (Positive)', async () => {
@@ -21,14 +18,9 @@ describe('Worker Service Unit Tests', () => {
 
         taskModel.update.mockResolvedValue(true);
 
-        const processPromise = processTask(mockMessage);
+        const success = await processTask(mockMessage);
 
-        // Fast-forward processing delay
-        jest.runAllTimers();
-
-        const result = await processPromise;
-
-        expect(result).toBe(true);
+        expect(success).toBe(true);
         expect(taskModel.update).toHaveBeenCalledWith('123', { status: 'PROCESSING' });
         expect(taskModel.update).toHaveBeenCalledWith('123', expect.objectContaining({ 
             status: 'COMPLETED'
