@@ -1,14 +1,4 @@
 # docker-compose.yml - Multi-Container Orchestration
-# 
-# This file will:
-# 1. Define 'mysql_db' service for persistent storage.
-# 2. Define 'rabbitmq' service for message brokering.
-# 3. Define 'api_service' which depends on DB and RabbitMQ.
-# 4. Define 'worker_service' which also depends on DB and RabbitMQ.
-# 5. Configure networks, volumes, and environment variables for all services.
-
-# compose file for all docker services
-
 version: '3.8'
 
 services:
@@ -19,9 +9,16 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DB}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - app_network
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -29,6 +26,16 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
 
   api_service:
     build: ./api-service
@@ -36,35 +43,47 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - mysql_db
-      - rabbitmq
+      mysql_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
-      MYSQL_HOST: ${MYSQL_HOST}
-      MYSQL_PORT: ${MYSQL_PORT}
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_HOST: mysql_db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DB: ${MYSQL_DB}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    networks:
+      - app_network
 
   worker_service:
     build: ./worker-service
     container_name: worker_service
     depends_on:
-      - mysql_db
-      - rabbitmq
+      mysql_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
-      MYSQL_HOST: ${MYSQL_HOST}
-      MYSQL_PORT: ${MYSQL_PORT}
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_HOST: mysql_db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DB: ${MYSQL_DB}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    networks:
+      - app_network
 
 volumes:
   mysql_data:
+
+networks:
+  app_network:
+    driver: bridge
