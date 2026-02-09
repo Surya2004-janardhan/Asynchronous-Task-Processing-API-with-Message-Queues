@@ -10,9 +10,7 @@
 
 // interaction logic with sql table tht we created in init.sql
 
-// const db = require('../config/database');
-// fixing correct path for db 
-const db = require('../db/init.sql');
+const db = require('../config/db');
 
 // create task
 async function create(task) {
