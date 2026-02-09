@@ -10,7 +10,7 @@
 create database if not exists task_db;
 
 create table if not exists tasks (
-    id int auto_increment primary key,
+    id varchar(36) primary key,
     title varchar(255) not null,
     description text,
     status varchar(50) default 'pending',
