@@ -9,7 +9,7 @@
 
 // main logic 
 
-const db = require('../db/init.sql');
+const db = require('../config/db');
 
 // update task status
 async function update(id, task) {
