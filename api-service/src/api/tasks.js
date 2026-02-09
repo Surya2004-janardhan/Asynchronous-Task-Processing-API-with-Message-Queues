@@ -26,7 +26,10 @@ router.post('/', async (req, res) => {
 
     try {
         const task = await taskService.create(req.body);
-        res.status(202).json(task);
+        res.status(202).json({
+            task_id: task.id,
+            message: 'Task submitted successfully for processing'
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -39,7 +42,15 @@ router.get('/:id', async (req, res) => {
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
         }
-        res.json(task);
+        res.json({
+            task_id: task.id,
+            status: task.status,
+            title: task.title,
+            description: task.description,
+            created_at: task.created_at,
+            updated_at: task.updated_at,
+            completed_at: task.completed_at
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
