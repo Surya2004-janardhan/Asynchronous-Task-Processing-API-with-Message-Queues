@@ -1,0 +1,7 @@
+-- init.sql - Database Schema Creation
+-- 
+-- This script will:
+-- 1. Create the 'tasks' table if it doesn't already exist.
+-- 2. Define columns: id (UUID), title, description, status (ENUM), metadata (JSON), created_at, updated_at, completed_at.
+-- 3. Set up appropriate defaults and indexes for performance.
+-- 4. Be executed automatically by the MySQL container on startup.

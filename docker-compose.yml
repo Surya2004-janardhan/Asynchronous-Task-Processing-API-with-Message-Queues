@@ -1,0 +1,8 @@
+# docker-compose.yml - Multi-Container Orchestration
+# 
+# This file will:
+# 1. Define 'mysql_db' service for persistent storage.
+# 2. Define 'rabbitmq' service for message brokering.
+# 3. Define 'api_service' which depends on DB and RabbitMQ.
+# 4. Define 'worker_service' which also depends on DB and RabbitMQ.
+# 5. Configure networks, volumes, and environment variables for all services.
