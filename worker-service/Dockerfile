@@ -23,8 +23,6 @@ RUN npm install
 # Copy the worker application source code
 COPY . .
 
-# Expose the port the app runs on
-EXPOSE 3001
 
 # Start the worker process
 CMD ["node", "src/main.js"]
